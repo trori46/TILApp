@@ -1,5 +1,6 @@
 import FluentPostgreSQL
 import Vapor
+import Authentication
 
 /// Called before your application initializes.
 public func configure(_ config: inout Config, _ env: inout Environment, _ services: inout Services) throws {
@@ -18,12 +19,23 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     services.register(middlewares)
     
     // Register the configured SQLite database to the database config.
+    let databaseName: String
+    let databasePort: Int
+    
+    if (env == .testing) {
+        databaseName = "vapor-test"
+        databasePort = 5433
+    } else {
+        databaseName = "vapor"
+        databasePort = 5432
+    }
     var databases = DatabasesConfig()
     
     let databaseConfig = PostgreSQLDatabaseConfig(
         hostname: "localhost",
+        port: databasePort,
         username: "vapor",
-        database: "vapor",
+        database: databaseName,
         password: "password")
     
     let database = PostgreSQLDatabase(config: databaseConfig)
@@ -33,6 +45,16 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     
     // Configure migrations
     var migrations = MigrationConfig()
+    migrations.add(model: User.self, database: .psql)
     migrations.add(model: Acronym.self, database: .psql)
+    migrations.add(model: Category.self, database: .psql)
+    migrations.add(model: AcronymCategoryPivot.self, database: .psql)
+    migrations.add(model: Token.self, database: .psql)
     services.register(migrations)
+    
+    var commandConfig = CommandConfig.default()
+    commandConfig.useFluentCommands()
+    services.register(commandConfig)
+    
+    try services.register(AuthenticationProvider())
 }
